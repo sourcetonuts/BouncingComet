@@ -1,7 +1,6 @@
 import time
 import board
 import touchio
-from digitalio import DigitalInOut, Direction, Pull
 import neopixel
 import adafruit_fancyled.adafruit_fancyled as fancy
 
@@ -18,7 +17,6 @@ print( "FancyPole Gemma M0" )
 grad = [ (0.0,0xFF0000), (0.33,0x00FF00), (0.67,0x0000FF), (1.0,0xFF0000)]
 palette = fancy.expand_gradient( grad, 20 )
 
-# todo read in these as stored from NVM or Drive or ?
 onoff = True
 offset = 0.001
 
