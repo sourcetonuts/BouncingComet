@@ -5,33 +5,12 @@ from digitalio import DigitalInOut, Direction, Pull
 import neopixel
 import adafruit_fancyled.adafruit_fancyled as fancy
 
-# GEMMA M0 wiring
-#   USB micro for power
-#   pin 6 aka A2 to touch button/copper pad
-#   pin 2 aka D1 to NeoPixel data input pin
-#   along with USB and GND from the Trinket for NeoPixel power/ground/data-in 3 conductor cable
+num_pixels = 30
 
-# Gemma M0 pins
-pin_leddata = board.D1
-pin_touch = board.A1
-
-# TRINKET M0
-# with the following 96 LED setup on an Adafruit Trinket M0
-# it could be wired up to run off of a basic/standard USB charger or laptop
-# cabling required for Trinket
-#   USB micro for power
-#   pin 1 to touch button/copper pad
-#   pin 4 to NeoPixel data input pin
-#   along with USB and GND from the Trinket for NeoPixel power/ground/data-in 3 conductor cable
-
-# Trinket M0 pins
-# pin_leddata = board.D4
-# pin_touch = board.A0
+# pin usage: TRINKET: board.D4, GEMMA: board.D1
+strip = neopixel.NeoPixel( board.D1, num_pixels, brightness = 0.25, auto_write = False )
 
 print( "FancyPole Gemma M0" )
-num_pixels = 30
-strip = neopixel.NeoPixel( pin_leddata, num_pixels, brightness = 0.25, auto_write = False )
-touch = touchio.TouchIn( pin_touch )
 
 # refer to
 # https://learn.adafruit.com/fancyled-library-for-circuitpython/led-colors
@@ -43,43 +22,61 @@ palette = fancy.expand_gradient( grad, 20 )
 onoff = True
 offset = 0.001
 
-def show_static() :
-    print("show_static()")
+def color_selected() :
     # pick the center color and fill the strip with that color statically displayed
     colorindex = offset + 0.5
-    color = fancy.palette_lookup( palette, colorindex )
+    return fancy.palette_lookup( palette, colorindex )
+
+def show_static() :
+    color = color_selected()
     strip.fill( color.pack() )
     strip.show()
-    print( "offset: {}".format(offset) )
 
 def palette_cycle() :
     for i in range( num_pixels ) :
         colorindex = offset + ( i / num_pixels )
         color = fancy.palette_lookup( palette, colorindex )
         strip[i] = color.pack()
-        if touch.value :
-            return
     strip.show()
+
+
+class TouchMode :
+    def __init__( self, pin, lastmode = 1, name = None ) :
+        self.mode = 0
+        self.lastmode = lastmode
+        self.touch = touchio.TouchIn( pin )
+        self.name = name or "mode"
+
+    def exec( self ) :
+        wasoff = not self.touch.value
+        time.sleep(0.005)  # 5ms delay for debounce
+        if not wasoff and self.touch.value :
+            # just touched button
+            time.sleep(0.005)  # 5ms delay for debounce
+            if self.mode >= self.lastmode :
+                self.mode = 0
+            else :
+                self.mode = self.mode + 1
+            # debounce
+            time.sleep( 0.5 )
+            print( self.name + " {}".format( self.mode ) )
+        return self.mode
+
+# OnOff pin usage: TRINKET: board.A0, GEMMA: board.A1
+# Mode pin usage: TRINKET: board. TBD ??, GEMMA: board.A2
+
+onoffMachine = TouchMode( board.A1, 1, "onoff" )
+modeMachine = TouchMode( board.A2, 2 )
 
 # Loop Forever
 while True :
-    if onoff :
-        # cycle the rainbow when on
+    if onoffMachine.exec() == 0 :
         palette_cycle()
         offset += 0.035 # this sets how quickly the rainbow changes (bigger is faster)
-
-    # deal onoff w/ button presses...
-    wason = not touch.value
-    time.sleep(0.005)  # 5ms delay for debounce
-    if not wason and touch.value :
-        # just touched mode button
-        time.sleep(0.005)  # 5ms delay for debounce
-        onoff = not onoff # toggle onoff state
-
-        if onoff :
-            print("rainbow")
-        else :
+    else :
+        mode = modeMachine.exec()
+        if mode == 0 :
             # and if just off just off paint/fill w/ the center color
             show_static()
-
-        time.sleep( 0.5 )  # big delay so we dont 2x trigger button presses
+        else :
+            show_static()
