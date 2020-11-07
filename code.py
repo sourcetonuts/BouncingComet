@@ -17,26 +17,22 @@ print( "FancyPole Gemma M0" )
 grad = [ (0.0,0xFF0000), (0.33,0x00FF00), (0.67,0x0000FF), (1.0,0xFF0000)]
 palette = fancy.expand_gradient( grad, 20 )
 
-onoff = True
-offset = 0.001
-
-def color_selected() :
+def color_selected( coloff ) :
     # pick the center color and fill the strip with that color statically displayed
-    colorindex = offset + 0.5
+    colorindex = coloff + 0.5
     return fancy.palette_lookup( palette, colorindex )
 
-def show_static() :
-    color = color_selected()
+def show_static( coloff ) :
+    color = color_selected( coloff )
     strip.fill( color.pack() )
     strip.show()
 
-def palette_cycle() :
+def palette_cycle( coloff ) :
     for i in range( num_pixels ) :
-        colorindex = offset + ( i / num_pixels )
+        colorindex = coloff + ( i / num_pixels )
         color = fancy.palette_lookup( palette, colorindex )
         strip[i] = color.pack()
     strip.show()
-
 
 class TouchMode :
     def __init__( self, pin, lastmode = 1, name = None ) :
@@ -66,15 +62,19 @@ class TouchMode :
 onoffMachine = TouchMode( board.A1, 1, "onoff" )
 modeMachine = TouchMode( board.A2, 2 )
 
+onoff = True
+offset = 0.001
+
 # Loop Forever
 while True :
-    if onoffMachine.exec() == 0 :
-        palette_cycle()
+    OnOff = onoffMachine.exec()
+    if OnOff == 0 :
+        palette_cycle(offset)
         offset += 0.035 # this sets how quickly the rainbow changes (bigger is faster)
     else :
         mode = modeMachine.exec()
         if mode == 0 :
             # and if just off just off paint/fill w/ the center color
-            show_static()
+            show_static(offset)
         else :
-            show_static()
+            show_static(offset)
