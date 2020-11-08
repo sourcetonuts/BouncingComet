@@ -1,80 +1,94 @@
 import time
 import board
-import touchio
-import neopixel
+import adafruit_dotstar as dotstar
 import adafruit_fancyled.adafruit_fancyled as fancy
 
-num_pixels = 30
+num_pixels = 54
+strip = dotstar.DotStar( board.SCK, board.MOSI, num_pixels, brightness=1.0, auto_write=False )
+print( "BouncingComet" )
 
-# pin usage: TRINKET: board.D4, GEMMA: board.D1
-strip = neopixel.NeoPixel( board.D1, num_pixels, brightness = 0.25, auto_write = False )
-
-print( "FancyPole Gemma M0" )
-
-# refer to
+# refer to for gradiant / color info
 # https://learn.adafruit.com/fancyled-library-for-circuitpython/led-colors
-# across the rainbow
-grad = [ (0.0,0xFF0000), (0.33,0x00FF00), (0.67,0x0000FF), (1.0,0xFF0000)]
-palette = fancy.expand_gradient( grad, 20 )
 
-def color_selected( coloff ) :
-    # pick the center color and fill the strip with that color statically displayed
-    colorindex = coloff + 0.5
-    return fancy.palette_lookup( palette, colorindex )
+class Comet( object ) :
+    def __init__( self, strip ) :
+        self.strip = strip
+        self.reset()
 
-def show_static( coloff ) :
-    color = color_selected( coloff )
-    strip.fill( color.pack() )
-    strip.show()
+    def reset( self ) :
+        self.BLACK = (0,0,0)
+        self.hue = 5
+        self.sat = 1.0
+        self.bri = 1.0
+        self.satdelta = 0.05
+        self.up = True
+        self.indexLast = strip.n - 1
+        self.length = 5
+        self.current = 0
+        self.delay = 0.0
+        strip.fill( self.BLACK )
+        strip.show()
 
-def palette_cycle( coloff ) :
-    for i in range( num_pixels ) :
-        colorindex = coloff + ( i / num_pixels )
-        color = fancy.palette_lookup( palette, colorindex )
-        strip[i] = color.pack()
-    strip.show()
+    def animate( self ) :
+        if self.up :
+            self.draw_up()
+        else :
+            self.draw_down()
+        time.sleep( self.delay )
+        self.next()
 
-class TouchMode :
-    def __init__( self, pin, lastmode = 1, name = None ) :
-        self.mode = 0
-        self.lastmode = lastmode
-        self.touch = touchio.TouchIn( pin )
-        self.name = name or "mode"
+    def draw_up( self ) :
+        next = self.current
+        end = next + self.length
+        nextsat = self.sat - ( ( self.length - 1 ) * self.satdelta )
 
-    def exec( self ) :
-        wasoff = not self.touch.value
-        time.sleep(0.005)  # 5ms delay for debounce
-        if not wasoff and self.touch.value :
-            # just touched button
-            time.sleep(0.005)  # 5ms delay for debounce
-            if self.mode >= self.lastmode :
-                self.mode = 0
-            else :
-                self.mode = self.mode + 1
-            # debounce
-            time.sleep( 0.5 )
-            print( self.name + " {}".format( self.mode ) )
-        return self.mode
+        if ( next >= 0 ) :
+            strip[next] = self.BLACK
 
-# OnOff pin usage: TRINKET: board.A0, GEMMA: board.A1
-# Mode pin usage: TRINKET: board. TBD ??, GEMMA: board.A2
+        while ( next < end ) :
+            nextsat = nextsat + self.satdelta
+            color = fancy.CHSV(self.hue,nextsat,self.bri)
+            next = next + 1
+            self.strip[next] = color.pack()
 
-onoffMachine = TouchMode( board.A1, 1, "onoff" )
-modeMachine = TouchMode( board.A2, 2 )
+        self.strip.show()
 
-onoff = True
-offset = 0.001
+    def draw_down( self ) :
+        next = self.current
+        end = next + self.length
+        nextsat = self.sat
+
+        while ( next < end ) :
+            color = fancy.CHSV(self.hue,nextsat,self.bri)
+            next = next + 1
+            self.strip[next] = color.pack()
+            nextsat = nextsat - self.satdelta
+
+        next = next + 1
+        if next <= self.indexLast :
+            self.strip[next] = self.BLACK
+        self.strip.show()
+
+    def next( self ) :
+        if self.up :
+            self.delay = self.delay + ( self.current * 0.0001 ) # 0.002
+            self.current = self.current + 1
+        else :
+            self.delay = self.delay - ( self.current * 0.0001 ) # 0.002
+            self.current = self.current - 1
+
+        if ( self.delay < 0 ) :
+            self.delay = 0
+
+        if ( self.up and ( self.current + self.length ) > self.indexLast ) :
+            self.up = False
+            self.current = self.indexLast - self.length
+        elif ( not self.up and self.current == 0 ) :
+            self.up = True
+
+print( "strip {} pixels".format( strip.n ) )
+comet = Comet( strip )
 
 # Loop Forever
 while True :
-    OnOff = onoffMachine.exec()
-    if OnOff == 0 :
-        palette_cycle(offset)
-        offset += 0.035 # this sets how quickly the rainbow changes (bigger is faster)
-    else :
-        mode = modeMachine.exec()
-        if mode == 0 :
-            # and if just off just off paint/fill w/ the center color
-            show_static(offset)
-        else :
-            show_static(offset)
+    comet.animate()
